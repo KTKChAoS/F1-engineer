@@ -315,6 +315,62 @@ public static class F1PacketWriter
         return w.ToArray();
     }
 
+    public static byte[] SessionHistory(in HeaderParams header, in SessionHistoryData history)
+    {
+        var w = new LittleEndianBuffer(PacketSizes.SessionHistory);
+        WriteHeader(w, header with { PacketId = 11 });
+        w.U8(history.CarIndex);
+        w.U8((byte)Math.Min(history.Laps.Count, 100));
+        w.U8((byte)Math.Min(history.TyreStints.Count, 8));
+        w.U8(history.BestLapTimeLap);
+        w.U8(history.BestSector1Lap);
+        w.U8(history.BestSector2Lap);
+        w.U8(history.BestSector3Lap);
+
+        for (var i = 0; i < 100; i++)
+        {
+            var lap = i < history.Laps.Count ? history.Laps[i] : default;
+            w.U32(lap.LapTimeMs);
+            WriteMinuteMs(w, lap.Sector1Ms);
+            WriteMinuteMs(w, lap.Sector2Ms);
+            WriteMinuteMs(w, lap.Sector3Ms);
+            w.U8(lap.ValidFlags);
+        }
+
+        for (var i = 0; i < 8; i++)
+        {
+            var stint = i < history.TyreStints.Count ? history.TyreStints[i] : default;
+            w.U8(stint.EndLap);
+            w.U8(stint.ActualCompound);
+            w.U8(stint.VisualCompound);
+        }
+
+        return w.ToArray();
+    }
+
+    public static byte[] TyreSets(in HeaderParams header, in TyreSetsData tyres)
+    {
+        var w = new LittleEndianBuffer(PacketSizes.TyreSets);
+        WriteHeader(w, header with { PacketId = 12 });
+        w.U8(tyres.CarIndex);
+        for (var i = 0; i < 20; i++)
+        {
+            var set = i < tyres.Sets.Count ? tyres.Sets[i] : default;
+            w.U8(set.ActualCompound);
+            w.U8(set.VisualCompound);
+            w.U8(set.WearPct);
+            w.U8(set.Available ? (byte)1 : (byte)0);
+            w.U8(set.RecommendedSession);
+            w.U8(set.LifeSpan);
+            w.U8(set.UsableLife);
+            w.I16(set.LapDeltaMs);
+            w.U8(set.Fitted ? (byte)1 : (byte)0);
+        }
+
+        w.U8(tyres.FittedIndex);
+        return w.ToArray();
+    }
+
     private static void WriteMinuteMs(LittleEndianBuffer w, uint totalMs)
     {
         var minutes = (byte)Math.Min(totalMs / 60_000, 255);
@@ -416,3 +472,24 @@ public readonly record struct ParticipantCar(
     bool IsAi);
 
 public readonly record struct MotionCar(float WorldX, float WorldZ);
+public readonly record struct SessionHistoryData(
+    byte CarIndex,
+    IReadOnlyList<SessionLapHistory> Laps,
+    IReadOnlyList<TyreStintHistory> TyreStints,
+    byte BestLapTimeLap = 1,
+    byte BestSector1Lap = 1,
+    byte BestSector2Lap = 1,
+    byte BestSector3Lap = 1);
+public readonly record struct SessionLapHistory(uint LapTimeMs, uint Sector1Ms, uint Sector2Ms, uint Sector3Ms, byte ValidFlags = 15);
+public readonly record struct TyreStintHistory(byte EndLap, byte ActualCompound, byte VisualCompound);
+public readonly record struct TyreSetsData(byte CarIndex, IReadOnlyList<TyreSet> Sets, byte FittedIndex = 0);
+public readonly record struct TyreSet(
+    byte ActualCompound,
+    byte VisualCompound,
+    byte WearPct,
+    bool Available,
+    byte RecommendedSession,
+    byte LifeSpan,
+    byte UsableLife,
+    short LapDeltaMs,
+    bool Fitted = false);

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
+    "generate:types": "dotnet run --project ../../tools/PitWall.TypeGen/PitWall.TypeGen.csproj --configuration Release -- src/contracts.generated.ts",
+    "build": "npm run generate:types && tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {

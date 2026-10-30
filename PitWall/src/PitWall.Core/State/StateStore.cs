@@ -12,6 +12,8 @@ public sealed class StateStore
     private readonly object _gate = new();
     private readonly Queue<DateTimeOffset> _packetTimes = new();
     private readonly List<EventRecord> _events = [];
+    private readonly List<LapRecord> _lapLog = [];
+    private readonly List<GapSample> _gapSamples = [];
     private readonly CarScratch[] _cars = new CarScratch[Constants.MaxCars];
     private RaceSnapshot _published = RaceSnapshot.Empty;
     private Mutable _m = new();
@@ -26,6 +28,8 @@ public sealed class StateStore
             _m = new Mutable { LastPacketUtc = _m.LastPacketUtc, PacketFormat = _m.PacketFormat };
             Array.Clear(_cars);
             _events.Clear();
+            _lapLog.Clear();
+            _gapSamples.Clear();
             _nextEventId = 1;
             PublishLocked(DateTimeOffset.UtcNow);
         }
@@ -51,6 +55,8 @@ public sealed class StateStore
                 _m = new Mutable();
                 Array.Clear(_cars);
                 _events.Clear();
+                _lapLog.Clear();
+                _gapSamples.Clear();
                 _nextEventId = 1;
             }
 
@@ -117,10 +123,28 @@ public sealed class StateStore
     {
         var laps = packet.LapData.AsSpan();
         var n = Math.Min(laps.Length, Constants.MaxCars);
+        var oldPlayerLap = _cars[_m.PlayerIndex].Lap;
         for (var i = 0; i < n; i++)
         {
             ref var dest = ref _cars[i];
             var src = laps[i];
+            if (i == _m.PlayerIndex && dest.Lap > 0 && src.CurrentLapNum > dest.Lap && src.LastLapTimeInMS > 0)
+            {
+                _lapLog.Add(new LapRecord
+                {
+                    LapNo = dest.Lap,
+                    LapMs = src.LastLapTimeInMS,
+                    S1Ms = ToMs(src.Sector1TimeInMinutes, src.Sector1TimeInMS),
+                    S2Ms = ToMs(src.Sector2TimeInMinutes, src.Sector2TimeInMS),
+                    S3Ms = Math.Max(0, src.LastLapTimeInMS - ToMs(src.Sector1TimeInMinutes, src.Sector1TimeInMS) - ToMs(src.Sector2TimeInMinutes, src.Sector2TimeInMS)),
+                    Valid = !dest.Invalid,
+                    Compound = dest.VisualCompound,
+                    WearPct = dest.WearPct?.ToArray() ?? new float[4],
+                    FuelKg = dest.FuelKg
+                });
+                if (_lapLog.Count > 100)
+                    _lapLog.RemoveAt(0);
+            }
             dest.LastLapMs = src.LastLapTimeInMS;
             dest.CurrentLapMs = src.CurrentLapTimeInMS;
             dest.Position = src.CarPosition;
@@ -142,6 +166,14 @@ public sealed class StateStore
             {
                 dest.BestLapMs = src.LastLapTimeInMS;
             }
+        }
+
+        var player = _cars[_m.PlayerIndex];
+        if (oldPlayerLap > 0 && player.Lap > oldPlayerLap)
+        {
+            _gapSamples.Add(new GapSample(player.Lap, player.GapAheadMs, FindGapBehind(player.Position)));
+            if (_gapSamples.Count > 4)
+                _gapSamples.RemoveAt(0);
         }
     }
 
@@ -197,7 +229,27 @@ public sealed class StateStore
         var n = Math.Min(cars.Length, Constants.MaxCars);
         for (var i = 0; i < n; i++)
         {
-            _cars[i].WearPct = ToFloats(cars[i].TyresWear);
+            ref var dest = ref _cars[i];
+            var src = cars[i];
+            dest.WearPct = ToFloats(src.TyresWear);
+            dest.FrontWingL = src.FrontLeftWingDamage;
+            dest.FrontWingR = src.FrontRightWingDamage;
+            dest.RearWing = src.RearWingDamage;
+            dest.Floor = src.FloorDamage;
+            dest.Diffuser = src.DiffuserDamage;
+            dest.Sidepod = src.SidepodDamage;
+            dest.DrsFault = src.DrsFault;
+            dest.ErsFault = src.ErsFault;
+            dest.Gearbox = src.GearBoxDamage;
+            dest.Engine = src.EngineDamage;
+            dest.EngineMguh = src.EngineMGUHWear;
+            dest.EngineEs = src.EngineESWear;
+            dest.EngineCe = src.EngineCEWear;
+            dest.EngineIce = src.EngineICEWear;
+            dest.EngineMguk = src.EngineMGUKWear;
+            dest.EngineTc = src.EngineTCWear;
+            dest.EngineBlown = src.EngineBlown;
+            dest.EngineSeized = src.EngineSeized;
         }
     }
 
@@ -235,15 +287,7 @@ public sealed class StateStore
     private void PublishLocked(DateTimeOffset now)
     {
         var player = _cars[_m.PlayerIndex];
-        var gapBehind = 0f;
-        for (var i = 0; i < _cars.Length; i++)
-        {
-            if (_cars[i].Position == player.Position + 1)
-            {
-                gapBehind = _cars[i].GapAheadMs;
-                break;
-            }
-        }
+        var gapBehind = FindGapBehind(player.Position) ?? 0f;
 
         var age = _m.LastPacketUtc is { } last ? now - last : Timeout.InfiniteTimeSpan;
         var connection = age == Timeout.InfiniteTimeSpan
@@ -278,6 +322,52 @@ public sealed class StateStore
             VisualCompound = player.VisualCompound,
             TyreAgeLaps = player.TyreAgeLaps,
             Events = _events.ToArray(),
+            LapLog = _lapLog.ToArray(),
+            Damage = new DamageInfo
+            {
+                FrontWingL = player.FrontWingL,
+                FrontWingR = player.FrontWingR,
+                RearWing = player.RearWing,
+                Floor = player.Floor,
+                Diffuser = player.Diffuser,
+                Sidepod = player.Sidepod,
+                DrsFault = player.DrsFault,
+                ErsFault = player.ErsFault,
+                Gearbox = player.Gearbox,
+                Engine = player.Engine,
+                EngineMguh = player.EngineMguh,
+                EngineEs = player.EngineEs,
+                EngineCe = player.EngineCe,
+                EngineIce = player.EngineIce,
+                EngineMguk = player.EngineMguk,
+                EngineTc = player.EngineTc,
+                EngineBlown = player.EngineBlown,
+                EngineSeized = player.EngineSeized
+            },
+            GapAheadTrendMsPerLap = CalculateGapTrend(ahead: true),
+            GapBehindTrendMsPerLap = CalculateGapTrend(ahead: false),
+            FieldCars = _cars.Select((car, i) => new CarInfo
+            {
+                Index = i,
+                Name = car.Name,
+                TeamId = car.TeamId,
+                RaceNumber = car.RaceNumber,
+                Position = car.Position,
+                GridPosition = car.Grid,
+                GapLeaderMs = car.GapLeaderMs,
+                IntervalMs = car.GapAheadMs,
+                LastLapMs = car.LastLapMs,
+                BestLapMs = car.BestLapMs,
+                Compound = car.VisualCompound,
+                TyreAgeLaps = car.TyreAgeLaps,
+                PitStatus = car.Pit,
+                Stops = car.Stops,
+                PenaltiesS = car.PenaltiesS,
+                DriverStatus = car.DriverStatus,
+                ResultStatus = car.ResultStatus,
+                IsPlayer = i == _m.PlayerIndex,
+                IsAi = car.IsAi
+            }).ToArray(),
             Player = new PlayerInfo
             {
                 CarIndex = _m.PlayerIndex,
@@ -334,6 +424,32 @@ public sealed class StateStore
     }
 
     private static uint ToMs(byte minutes, ushort msPart) => (uint)minutes * 60_000u + msPart;
+
+    private float? FindGapBehind(byte playerPosition)
+    {
+        for (var i = 0; i < _cars.Length; i++)
+        {
+            if (_cars[i].Position == playerPosition + 1)
+                return _cars[i].GapAheadMs;
+        }
+        return null;
+    }
+
+    private float? CalculateGapTrend(bool ahead)
+    {
+        if (_gapSamples.Count < 2)
+            return null;
+
+        var first = _gapSamples[0];
+        var last = _gapSamples[^1];
+        var lapSpan = last.Lap - first.Lap;
+        if (lapSpan <= 0 || (!ahead && (first.BehindMs is null || last.BehindMs is null)))
+            return null;
+
+        var firstGap = ahead ? first.AheadMs : first.BehindMs!.Value;
+        var lastGap = ahead ? last.AheadMs : last.BehindMs!.Value;
+        return (lastGap - firstGap) / lapSpan;
+    }
 
     private static float[] ToFloats<T>(Tyres<T> tyres) where T : unmanaged
     {
@@ -396,7 +512,12 @@ public sealed class StateStore
         public byte TeamId;
         public byte RaceNumber;
         public bool IsAi;
+        public float FrontWingL, FrontWingR, RearWing, Floor, Diffuser, Sidepod;
+        public bool DrsFault, ErsFault, EngineBlown, EngineSeized;
+        public float Gearbox, Engine, EngineMguh, EngineEs, EngineCe, EngineIce, EngineMguk, EngineTc;
     }
+
+    private readonly record struct GapSample(byte Lap, float AheadMs, float? BehindMs);
 
     private sealed class Mutable
     {

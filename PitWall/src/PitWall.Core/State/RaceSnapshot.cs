@@ -44,4 +44,9 @@ public sealed class RaceSnapshot
     public TyreCompound VisualCompound { get; init; }
     public int TyreAgeLaps { get; init; }
     public IReadOnlyList<EventRecord> Events { get; init; } = [];
+    public IReadOnlyList<CarInfo> FieldCars { get; init; } = [];
+    public IReadOnlyList<LapRecord> LapLog { get; init; } = [];
+    public DamageInfo Damage { get; init; } = new();
+    public float? GapAheadTrendMsPerLap { get; init; }
+    public float? GapBehindTrendMsPerLap { get; init; }
 }

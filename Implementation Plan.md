@@ -1,6 +1,6 @@
 # PitWall F1 25 — Implementation Plan
 
-## Current Status: 🚧 M1 POC Listener — In Progress
+## Current Status: 🚧 M2 LAN Acceptance Pending; M3 Widgets — In Progress
 
 Progress was reconciled against the repository on 30 October 2026. A checked item means there is a concrete implementation or artifact in the repo; acceptance criteria and tests remain unchecked until they are present and verified.
 
@@ -25,19 +25,19 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 
 ---
 
-## M1 — POC Listener (In Progress)
+## M1 — POC Listener (Complete)
 **Goal:** Host shows PPS + decoded player telemetry from PS5 or Sim; recorder/replayer work.
 
 ### Steps:
 1. [x] Implement `UdpReceiver` with bounded Channel (§8.1)
-2. [x] Implement `PacketDecoder` wrapping F1Game.UDP (§8.2) — basic size/decode/session/frame handling exists; full header validation and decoder coverage are still outstanding
+2. [x] Implement `PacketDecoder` wrapping F1Game.UDP (§8.2) — validates/decode packets, tracks sessions and stale frames; round-trip coverage added
 3. [x] Basic `StateStore` for player telemetry (§8.4) — player telemetry and some session/event data exist; full field state and lap history remain for M2
 4. [x] `Recorder` writing .pwrec files (§8.6)
 5. [x] `Replayer` feeding recordings at 1x/2x/4x (§8.6) — reusable API supports speed and looping; Host UI currently exposes 1x replay only
-6. [ ] `PitWall.Sim` tool: synthetic data generator (§8.6) — project is present, but currently only prints “Hello, World!”
+6. [x] `PitWall.Sim` tool: synthetic 22-car, 5-lap race generator (§8.6), including Session, Lap Data, Car Telemetry, Car Status, Car Damage, Participants, Tyre Sets, Session History, Event and Motion packets
 7. [x] Host WPF showing connection state, PPS, and player data
-8. [ ] Unit tests: decoder fixtures, recorder round-trip
-9. [ ] Accept: replay a recording → same values
+8. [x] Unit tests: decoder packet round-trips, malformed/stale handling, and recorder round-trip
+9. [x] Accept: replay a recording → same values — replayed a 14.8 s live capture through `Replayer` to an isolated UDP listener: all 5,359 datagrams matched byte-for-byte and decoded; 0 malformed or stale packets
 
 ---
 
@@ -45,17 +45,17 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 **Goal:** Full state store, snapshot builder, Kestrel + WebSocket, React MVP widgets 1-4.
 
 ### Steps:
-1. [ ] Complete `StateStore` (all 22 cars, events, lap log) (§8.4)
-2. [ ] `SnapshotBuilder` emitting `live`/`field`/`event` messages (§8.5)
-3. [ ] Kestrel server with WebSocket endpoint (§10)
-4. [ ] Static file serving for web client
-5. [ ] React/Vite/TypeScript/Zustand web client scaffold (§4)
-6. [ ] TypeScript types generated from Contracts
-7. [ ] Widget 1: Timing Tower
-8. [ ] Widget 2: Driver Card (speed, gear, RPM, throttle, brake, DRS)
-9. [ ] Widget 3: Tyre Diagram (wear, temps, pressure, compound)
-10. [ ] Widget 4: Fuel & ERS
-11. [ ] Dashboard header (session, track, lap, weather, connection)
+1. [x] Complete `StateStore` with all 22 car slots, event history, and completed player lap log (§8.4)
+2. [x] `SnapshotBuilder` emits `live`/`field`/`event` payloads (§8.5)
+3. [x] Kestrel server with WebSocket endpoint (§10)
+4. [x] Static file serving for web client
+5. [x] React/Vite/TypeScript/Zustand web client scaffold (§4)
+6. [x] TypeScript types generated from Contracts by `tools/PitWall.TypeGen`; web production builds regenerate the types
+7. [x] Widget 1: Timing Tower
+8. [x] Widget 2: Driver Card (speed, gear, RPM, throttle, brake, DRS)
+9. [x] Widget 3: Tyre Diagram (wear, temps, pressure, compound)
+10. [x] Widget 4: Fuel & ERS
+11. [x] Dashboard header (session, track, lap, weather, connection)
 12. [ ] Accept: phone on LAN sees live data
 
 ---
@@ -64,8 +64,8 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 **Goal:** Widgets 5-10, driver view, call system, audio, alerts.
 
 ### Steps:
-1. [ ] Widget 5: Gap Ahead/Behind with trend arrows
-2. [ ] Widget 6: Lap Table (last 10 laps, sectors)
+1. [x] Widget 5: Gap Ahead/Behind with per-lap trend arrows
+2. [x] Widget 6: Lap Table (last 10 laps, sectors, validity, compound)
 3. [ ] Widget 7: Damage Panel
 4. [ ] Widget 8: Weather Panel + forecast
 5. [ ] Widget 9: Events Feed

@@ -9,10 +9,7 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
-        var logDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            Constants.AppDataFolderName,
-            "logs");
+        var logDir = ProjectPaths.LogsDirectory;
         Directory.CreateDirectory(logDir);
 
         Log.Logger = new LoggerConfiguration()

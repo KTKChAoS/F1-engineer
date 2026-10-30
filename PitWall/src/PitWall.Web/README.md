@@ -9,4 +9,4 @@ npm install
 npm run dev
 ```
 
-Create production static files with `npm run build`; Vite writes them to `dist/`.
+`npm run build` regenerates TypeScript wire types from `PitWall.Contracts`, type-checks the client, and writes production static files to `dist/`. The build requires the .NET 10 SDK as well as Node.js. Run `npm run generate:types` directly when you only need to refresh the generated contracts.

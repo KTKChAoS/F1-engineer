@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly Recorder _recorder = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private TelemetryPipeline? _pipeline;
+    private LocalWebHost? _webHost;
     private CancellationTokenSource? _replayCts;
     private readonly string _recordingsDir;
     private readonly int _udpPort = Constants.DefaultUdpPort;
@@ -28,10 +29,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        _recordingsDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            Constants.AppDataFolderName,
-            "recordings");
+        _recordingsDir = ProjectPaths.RecordingsDirectory;
         IpText.Text = "This PC: " + string.Join(", ", GetPrivateIpv4Addresses());
     }
 
@@ -43,6 +41,9 @@ public partial class MainWindow : Window
         {
             _pipeline = new TelemetryPipeline(_udpPort, _store, _recorder, Log.Logger);
             _pipeline.Start();
+            _webHost = new LocalWebHost(_store, Constants.DefaultWebPort);
+            await _webHost.StartAsync();
+            Log.Information("Local dashboard listening on port {Port}", Constants.DefaultWebPort);
         }
         catch (Exception ex)
         {
@@ -62,6 +63,11 @@ public partial class MainWindow : Window
         if (_pipeline is not null)
         {
             await _pipeline.DisposeAsync();
+        }
+        if (_webHost is not null)
+        {
+            await _webHost.StopAsync();
+            await _webHost.DisposeAsync();
         }
     }
 

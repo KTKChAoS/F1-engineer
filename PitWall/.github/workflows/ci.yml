@@ -17,12 +17,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Build web client and generate contracts
+        working-directory: PitWall/src/PitWall.Web
+        run: npm ci && npm run build
       - name: Build solution
         run: dotnet build PitWall/PitWall.sln --configuration Release
       - name: Run .NET tests
         run: dotnet test PitWall/PitWall.sln --configuration Release --no-build
-      - name: Build web client
-        working-directory: PitWall/src/PitWall.Web
-        run: |
-          npm ci
-          npm run build
