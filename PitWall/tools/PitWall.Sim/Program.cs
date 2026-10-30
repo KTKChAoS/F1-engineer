@@ -1,11 +1,15 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using PitWall.Core.Recording;
 using PitWall.Core.Telemetry;
 
 var address = IPAddress.Loopback;
 var port = 20777;
 var hz = 10;
+string? replayPath = null;
+var replaySpeed = 1d;
+var loopReplay = false;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -24,6 +28,16 @@ for (var i = 0; i < args.Length; i++)
             if (!int.TryParse(args[++i], NumberStyles.None, CultureInfo.InvariantCulture, out hz) || hz is < 1 or > 60)
                 return Usage("--hz must be between 1 and 60.");
             break;
+        case "--replay" when i + 1 < args.Length:
+            replayPath = args[++i];
+            break;
+        case "--speed" when i + 1 < args.Length:
+            if (!double.TryParse(args[++i], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out replaySpeed) || replaySpeed is not (1 or 2 or 4))
+                return Usage("--speed must be 1, 2 or 4.");
+            break;
+        case "--loop":
+            loopReplay = true;
+            break;
         case "--help":
         case "-h":
             return Usage(null);
@@ -32,7 +46,6 @@ for (var i = 0; i < args.Length; i++)
     }
 }
 
-using var udp = new UdpClient(address.AddressFamily);
 using var stop = new CancellationTokenSource();
 Console.CancelKeyPress += (_, eventArgs) =>
 {
@@ -40,6 +53,15 @@ Console.CancelKeyPress += (_, eventArgs) =>
     stop.Cancel();
 };
 
+if (replayPath is not null)
+{
+    Console.WriteLine($"Replaying {replayPath} → {address}:{port} at {replaySpeed:0.##}x" + (loopReplay ? " (looping)" : ""));
+    await Replayer.ReplayToUdpAsync(replayPath, port, replaySpeed, loopReplay, stop.Token, address);
+    Console.WriteLine("Replay finished");
+    return 0;
+}
+
+using var udp = new UdpClient(address.AddressFamily);
 var endpoint = new IPEndPoint(address, port);
 var sessionUid = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 var tick = 0;
@@ -91,7 +113,9 @@ static int Usage(string? error)
 {
     if (error is not null)
         Console.Error.WriteLine(error);
-    Console.WriteLine("Usage: PitWall.Sim [--address 127.0.0.1] [--port 20777] [--hz 10]");
+    Console.WriteLine("Usage:");
+    Console.WriteLine("  PitWall.Sim [--address 127.0.0.1] [--port 20777] [--hz 10]");
+    Console.WriteLine("  PitWall.Sim --replay <file.pwrec> [--speed 1|2|4] [--loop] [--address 127.0.0.1] [--port 20777]");
     return error is null ? 0 : 2;
 }
 

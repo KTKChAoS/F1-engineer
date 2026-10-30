@@ -54,6 +54,29 @@ export interface CarInfo {
   "isAi": boolean;
 }
 
+export interface CarSetupInfo {
+  "frontWing": number;
+  "rearWing": number;
+  "onThrottle": number;
+  "offThrottle": number;
+  "frontCamber": number;
+  "rearCamber": number;
+  "frontToe": number;
+  "rearToe": number;
+  "frontSuspension": number;
+  "rearSuspension": number;
+  "frontAntiRollBar": number;
+  "rearAntiRollBar": number;
+  "frontSuspensionHeight": number;
+  "rearSuspensionHeight": number;
+  "brakePressure": number;
+  "brakeBias": number;
+  "engineBraking": number;
+  "tyrePressures": number[];
+  "ballast": number;
+  "fuelLoad": number;
+}
+
 export interface ConnectionInfo {
   "state": ConnectionState;
   "pps": number;
@@ -137,6 +160,10 @@ export interface EventRecord {
 export interface FieldPayload {
   "session": SessionInfo;
   "forecast": ForecastSample[];
+  "trackPath": MapPoint[];
+  "positionHistory": PositionHistoryRecord[];
+  "gapHistory": GapHistoryRecord[];
+  "setup"?: CarSetupInfo;
   "cars": CarInfo[];
   "tyreInfo": TyreDetailInfo;
   "damage": DamageInfo;
@@ -152,6 +179,12 @@ export interface ForecastSample {
   "trackTempC": number;
   "airTempC": number;
   "rainPct": number;
+}
+
+export interface GapHistoryRecord {
+  "lapNo": number;
+  "aheadMs": number;
+  "behindMs"?: number | null;
 }
 
 export interface HelloMessage {
@@ -197,6 +230,11 @@ export interface LivePayload {
   "energy": EnergyInfo;
 }
 
+export interface MapPoint {
+  "x": number;
+  "z": number;
+}
+
 export interface PingMessage {
   "ts": number;
 }
@@ -224,6 +262,11 @@ export interface PlayerInfo {
 export interface PongMessage {
   "ts": number;
   "serverTs": number;
+}
+
+export interface PositionHistoryRecord {
+  "lapNo": number;
+  "positions": number[];
 }
 
 export interface RoomClosedMessage {

@@ -23,6 +23,8 @@ public sealed class RaceSnapshot
     public int TrackId { get; init; }
     public float TrackLengthM { get; init; }
     public int TotalLaps { get; init; }
+    public int PitWindowIdeal { get; init; }
+    public int PitWindowLatest { get; init; }
     public float TimeLeftS { get; init; }
     public Weather Weather { get; init; }
     public float TrackTempC { get; init; }
@@ -48,6 +50,12 @@ public sealed class RaceSnapshot
     public IReadOnlyList<LapRecord> LapLog { get; init; } = [];
     public DamageInfo Damage { get; init; } = new();
     public IReadOnlyList<ForecastSample> Forecast { get; init; } = [];
+    public IReadOnlyList<MapPoint> TrackPath { get; init; } = [];
+    public IReadOnlyList<PositionHistoryRecord> PositionHistory { get; init; } = [];
+    public IReadOnlyList<GapHistoryRecord> GapHistory { get; init; } = [];
+    public CarSetupInfo? Setup { get; init; }
+    public IReadOnlyList<StintInfo> Stints { get; init; } = [];
+    public IReadOnlyList<TyreSetInfo> TyreSets { get; init; } = [];
     public float? GapAheadTrendMsPerLap { get; init; }
     public float? GapBehindTrendMsPerLap { get; init; }
     public int GapBehindUnder1sLaps { get; init; }

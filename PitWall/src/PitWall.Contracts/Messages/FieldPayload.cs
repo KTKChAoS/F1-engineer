@@ -15,6 +15,18 @@ public sealed class FieldPayload
     [JsonPropertyName("forecast")]
     public required ForecastSample[] Forecast { get; init; }
 
+    [JsonPropertyName("trackPath")]
+    public required MapPoint[] TrackPath { get; init; }
+
+    [JsonPropertyName("positionHistory")]
+    public required PositionHistoryRecord[] PositionHistory { get; init; }
+
+    [JsonPropertyName("gapHistory")]
+    public required GapHistoryRecord[] GapHistory { get; init; }
+
+    [JsonPropertyName("setup")]
+    public CarSetupInfo? Setup { get; init; }
+
     [JsonPropertyName("cars")]
     public required CarInfo[] Cars { get; init; }
 
@@ -116,6 +128,78 @@ public sealed class ForecastSample
 
     [JsonPropertyName("rainPct")]
     public int RainPct { get; init; }
+}
+
+public sealed class MapPoint
+{
+    [JsonPropertyName("x")]
+    public float X { get; init; }
+
+    [JsonPropertyName("z")]
+    public float Z { get; init; }
+}
+
+public sealed class PositionHistoryRecord
+{
+    [JsonPropertyName("lapNo")]
+    public int LapNo { get; init; }
+
+    [JsonPropertyName("positions")]
+    public required int[] Positions { get; init; }
+}
+
+public sealed class GapHistoryRecord
+{
+    [JsonPropertyName("lapNo")]
+    public int LapNo { get; init; }
+    [JsonPropertyName("aheadMs")]
+    public float AheadMs { get; init; }
+    [JsonPropertyName("behindMs")]
+    public float? BehindMs { get; init; }
+}
+
+public sealed class CarSetupInfo
+{
+    [JsonPropertyName("frontWing")]
+    public float FrontWing { get; init; }
+    [JsonPropertyName("rearWing")]
+    public float RearWing { get; init; }
+    [JsonPropertyName("onThrottle")]
+    public float OnThrottle { get; init; }
+    [JsonPropertyName("offThrottle")]
+    public float OffThrottle { get; init; }
+    [JsonPropertyName("frontCamber")]
+    public float FrontCamber { get; init; }
+    [JsonPropertyName("rearCamber")]
+    public float RearCamber { get; init; }
+    [JsonPropertyName("frontToe")]
+    public float FrontToe { get; init; }
+    [JsonPropertyName("rearToe")]
+    public float RearToe { get; init; }
+    [JsonPropertyName("frontSuspension")]
+    public int FrontSuspension { get; init; }
+    [JsonPropertyName("rearSuspension")]
+    public int RearSuspension { get; init; }
+    [JsonPropertyName("frontAntiRollBar")]
+    public int FrontAntiRollBar { get; init; }
+    [JsonPropertyName("rearAntiRollBar")]
+    public int RearAntiRollBar { get; init; }
+    [JsonPropertyName("frontSuspensionHeight")]
+    public int FrontSuspensionHeight { get; init; }
+    [JsonPropertyName("rearSuspensionHeight")]
+    public int RearSuspensionHeight { get; init; }
+    [JsonPropertyName("brakePressure")]
+    public float BrakePressure { get; init; }
+    [JsonPropertyName("brakeBias")]
+    public float BrakeBias { get; init; }
+    [JsonPropertyName("engineBraking")]
+    public float EngineBraking { get; init; }
+    [JsonPropertyName("tyrePressures")]
+    public required float[] TyrePressures { get; init; }
+    [JsonPropertyName("ballast")]
+    public int Ballast { get; init; }
+    [JsonPropertyName("fuelLoad")]
+    public float FuelLoad { get; init; }
 }
 
 // ── Cars ─────────────────────────────────────────────────────────────

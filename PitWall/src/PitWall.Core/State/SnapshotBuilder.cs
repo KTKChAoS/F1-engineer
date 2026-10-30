@@ -38,9 +38,13 @@ public static class SnapshotBuilder
             AirTempC = snapshot.AirTempC,
             SafetyCar = snapshot.SafetyCar,
             Paused = snapshot.Paused,
-            PitWindow = new PitWindowInfo()
+            PitWindow = new PitWindowInfo { Ideal = snapshot.PitWindowIdeal, Latest = snapshot.PitWindowLatest }
         },
         Forecast = snapshot.Forecast.ToArray(),
+        TrackPath = snapshot.TrackPath.ToArray(),
+        PositionHistory = snapshot.PositionHistory.ToArray(),
+        GapHistory = snapshot.GapHistory.ToArray(),
+        Setup = snapshot.Setup,
         Cars = snapshot.FieldCars.ToArray(),
         TyreInfo = new TyreDetailInfo
         {
@@ -51,7 +55,7 @@ public static class SnapshotBuilder
         },
         Damage = snapshot.Damage,
         Laps = snapshot.LapLog.ToArray(),
-        Strategy = new StrategyInfo { Stints = [], TyreSets = [] },
+        Strategy = new StrategyInfo { Stints = snapshot.Stints.ToArray(), TyreSets = snapshot.TyreSets.ToArray() },
         Derived = BuildDerived(snapshot),
         Events = snapshot.Events.ToArray()
     };
@@ -97,7 +101,7 @@ public static class SnapshotBuilder
         var ahead = snapshot.FieldCars.FirstOrDefault(car => car.Position == snapshot.Player.Position - 1);
         var undercut = ahead is not null
             && snapshot.Player.GapAheadMs < Constants.UndercutGapThresholdSeconds * 1000
-            && ahead.TyreAgeLaps >= snapshot.TyreAgeLaps + Constants.UndercutTyreAgeDeltaLaps;
+            && snapshot.TyreAgeLaps >= ahead.TyreAgeLaps + Constants.UndercutTyreAgeDeltaLaps;
 
         return new DerivedMetrics
         {

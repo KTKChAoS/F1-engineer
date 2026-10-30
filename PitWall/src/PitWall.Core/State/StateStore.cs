@@ -14,6 +14,8 @@ public sealed class StateStore
     private readonly List<EventRecord> _events = [];
     private readonly List<LapRecord> _lapLog = [];
     private readonly List<GapSample> _gapSamples = [];
+    private readonly List<MapPoint> _trackPath = [];
+    private readonly SortedDictionary<int, int[]> _positionsByLap = [];
     private readonly CarScratch[] _cars = new CarScratch[Constants.MaxCars];
     private RaceSnapshot _published = RaceSnapshot.Empty;
     private Mutable _m = new();
@@ -30,6 +32,8 @@ public sealed class StateStore
             _events.Clear();
             _lapLog.Clear();
             _gapSamples.Clear();
+            _trackPath.Clear();
+            _positionsByLap.Clear();
             _nextEventId = 1;
             PublishLocked(DateTimeOffset.UtcNow);
         }
@@ -57,6 +61,8 @@ public sealed class StateStore
                 _events.Clear();
                 _lapLog.Clear();
                 _gapSamples.Clear();
+                _trackPath.Clear();
+                _positionsByLap.Clear();
                 _nextEventId = 1;
             }
 
@@ -91,6 +97,26 @@ public sealed class StateStore
             {
                 ApplyDamage(damage);
             }
+            else if (packet.TryGetMotionDataPacket(out var motion))
+            {
+                ApplyMotion(motion);
+            }
+            else if (packet.TryGetCarSetupDataPacket(out var setups))
+            {
+                ApplySetups(setups);
+            }
+            else if (packet.TryGetTyreSetsDataPacket(out var tyreSets))
+            {
+                ApplyTyreSets(tyreSets);
+            }
+            else if (packet.TryGetSessionHistoryDataPacket(out var history))
+            {
+                ApplySessionHistory(history);
+            }
+            else if (packet.TryGetLapPositionsDataPacket(out var lapPositions))
+            {
+                ApplyLapPositions(lapPositions);
+            }
             else if (packet.TryGetParticipantsDataPacket(out var participants))
             {
                 ApplyParticipants(participants);
@@ -111,6 +137,8 @@ public sealed class StateStore
         _m.Track = TrackData.GetTrackName(_m.TrackId);
         _m.TrackLengthM = session.TrackLength;
         _m.TotalLaps = session.TotalLaps;
+        _m.PitWindowIdeal = session.PitStopWindowIdealLap;
+        _m.PitWindowLatest = session.PitStopWindowLatestLap;
         _m.TimeLeftS = session.SessionTimeLeft;
         _m.Weather = GameEnumMapper.Weather(session.Weather);
         _m.TrackTempC = session.TrackTemperature;
@@ -263,6 +291,113 @@ public sealed class StateStore
         }
     }
 
+    private void ApplyMotion(MotionDataPacket packet)
+    {
+        var cars = packet.CarMotionData.AsSpan();
+        if (_m.PlayerIndex >= cars.Length)
+            return;
+        var car = cars[_m.PlayerIndex];
+        var point = new MapPoint { X = car.WorldPositionX, Z = car.WorldPositionZ };
+        if (_trackPath.Count > 0)
+        {
+            var previous = _trackPath[^1];
+            var dx = point.X - previous.X;
+            var dz = point.Z - previous.Z;
+            if (dx * dx + dz * dz < 16f)
+                return;
+        }
+        _trackPath.Add(point);
+        if (_trackPath.Count > 1200)
+            _trackPath.RemoveRange(0, 200);
+    }
+
+    private void ApplySetups(CarSetupDataPacket packet)
+    {
+        var setups = packet.CarSetups.AsSpan();
+        if (_m.PlayerIndex >= setups.Length)
+            return;
+        var setup = setups[_m.PlayerIndex];
+        _m.Setup = new CarSetupInfo
+        {
+            FrontWing = setup.FrontWing,
+            RearWing = setup.RearWing,
+            OnThrottle = setup.OnThrottle,
+            OffThrottle = setup.OffThrottle,
+            FrontCamber = setup.FrontCamber,
+            RearCamber = setup.RearCamber,
+            FrontToe = setup.FrontToe,
+            RearToe = setup.RearToe,
+            FrontSuspension = setup.FrontSuspension,
+            RearSuspension = setup.RearSuspension,
+            FrontAntiRollBar = setup.FrontAntiRollBar,
+            RearAntiRollBar = setup.RearAntiRollBar,
+            FrontSuspensionHeight = setup.FrontSuspensionHeight,
+            RearSuspensionHeight = setup.RearSuspensionHeight,
+            BrakePressure = setup.BrakePressure,
+            BrakeBias = setup.BrakeBias,
+            EngineBraking = setup.EngineBraking,
+            TyrePressures = ToFloats(setup.TyresPressure),
+            Ballast = setup.Ballast,
+            FuelLoad = setup.FuelLoad
+        };
+    }
+
+    private void ApplyTyreSets(TyreSetsDataPacket packet)
+    {
+        if (packet.CarIndex != _m.PlayerIndex)
+            return;
+        _m.TyreSets = packet.TyreSetDatas.AsSpan().ToArray().Select(set => new TyreSetInfo
+        {
+            Compound = GameEnumMapper.Visual(set.VisualTyreCompound),
+            WearPct = set.Wear,
+            LifeLeft = set.LifeSpan,
+            Available = set.IsAvailable,
+            Fitted = set.IsFitted
+        }).ToArray();
+    }
+
+    private void ApplySessionHistory(SessionHistoryDataPacket packet)
+    {
+        if (packet.CarIndex != _m.PlayerIndex)
+            return;
+        var history = packet.TyreStintsHistoryData.AsSpan();
+        var count = Math.Min(packet.NumTyreStints, history.Length);
+        var stints = new List<StintInfo>(count);
+        var startLap = 1;
+        for (var i = 0; i < count; i++)
+        {
+            var endLap = history[i].EndLap == byte.MaxValue ? _cars[_m.PlayerIndex].Lap : history[i].EndLap;
+            stints.Add(new StintInfo
+            {
+                StartLap = startLap,
+                EndLap = Math.Max(startLap, endLap),
+                Compound = GameEnumMapper.Visual(history[i].TyreVisualCompound)
+            });
+            startLap = endLap + 1;
+        }
+        _m.Stints = stints;
+    }
+
+    private void ApplyLapPositions(LapPositionsDataPacket packet)
+    {
+        var vehicles = packet.PositionsPerLapForVehicle.AsSpan();
+        var count = Math.Min(vehicles.Length, Constants.MaxCars);
+        for (var car = 0; car < count; car++)
+        {
+            var positions = vehicles[car].AsSpan();
+            var lapCount = Math.Min(packet.NumberOfLaps, positions.Length);
+            for (var lap = 0; lap < lapCount; lap++)
+            {
+                var lapNo = packet.StartingLap + lap + 1;
+                if (!_positionsByLap.TryGetValue(lapNo, out var row))
+                    _positionsByLap[lapNo] = row = new int[Constants.MaxCars];
+                row[car] = positions[lap];
+            }
+        }
+        while (_positionsByLap.Count > 100)
+            _positionsByLap.Remove(_positionsByLap.Keys.First());
+    }
+
     private void ApplyParticipants(ParticipantsDataPacket packet)
     {
         var cars = packet.Participants.AsSpan();
@@ -323,6 +458,8 @@ public sealed class StateStore
             TrackId = _m.TrackId,
             TrackLengthM = _m.TrackLengthM,
             TotalLaps = _m.TotalLaps,
+            PitWindowIdeal = _m.PitWindowIdeal,
+            PitWindowLatest = _m.PitWindowLatest,
             TimeLeftS = _m.TimeLeftS,
             Weather = _m.Weather,
             TrackTempC = _m.TrackTempC,
@@ -330,6 +467,12 @@ public sealed class StateStore
             SafetyCar = _m.SafetyCar,
             Paused = _m.Paused,
             Forecast = _m.Forecast,
+            TrackPath = _trackPath.ToArray(),
+            PositionHistory = _positionsByLap.Select(pair => new PositionHistoryRecord { LapNo = pair.Key, Positions = pair.Value.ToArray() }).ToArray(),
+            GapHistory = _gapSamples.Select(sample => new GapHistoryRecord { LapNo = sample.Lap, AheadMs = sample.AheadMs, BehindMs = sample.BehindMs }).ToArray(),
+            Setup = _m.Setup,
+            Stints = _m.Stints,
+            TyreSets = _m.TyreSets,
             VisualCompound = player.VisualCompound,
             TyreAgeLaps = player.TyreAgeLaps,
             Events = _events.ToArray(),
@@ -563,6 +706,8 @@ public sealed class StateStore
         public int TrackId;
         public float TrackLengthM;
         public int TotalLaps;
+        public int PitWindowIdeal;
+        public int PitWindowLatest;
         public float TimeLeftS;
         public Weather Weather;
         public float TrackTempC;
@@ -570,5 +715,8 @@ public sealed class StateStore
         public SafetyCarStatus SafetyCar;
         public bool Paused;
         public IReadOnlyList<ForecastSample> Forecast = [];
+        public CarSetupInfo? Setup;
+        public IReadOnlyList<StintInfo> Stints = [];
+        public IReadOnlyList<TyreSetInfo> TyreSets = [];
     }
 }
