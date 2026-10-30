@@ -1,6 +1,6 @@
 # PitWall F1 25 — Implementation Plan
 
-## Current Status: 🚧 M3 Interactions & Alerts — In Progress
+## Current Status: ✅ M4 Full Local App — Complete; M5 Remote Sharing Deferred
 
 Progress was reconciled against the repository on 30 October 2026. A checked item means there is a concrete implementation or artifact in the repo; acceptance criteria and tests remain unchecked until they are present and verified.
 
@@ -33,7 +33,7 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 2. [x] Implement `PacketDecoder` wrapping F1Game.UDP (§8.2) — validates/decode packets, tracks sessions and stale frames; round-trip coverage added
 3. [x] Basic `StateStore` for player telemetry (§8.4) — player telemetry and some session/event data exist; full field state and lap history remain for M2
 4. [x] `Recorder` writing .pwrec files (§8.6)
-5. [x] `Replayer` feeding recordings at 1x/2x/4x (§8.6) — reusable API supports speed and looping; Host UI currently exposes 1x replay only
+5. [x] `Replayer` feeding recordings at 1x/2x/4x (§8.6) — Host UI supports 1x; Sim CLI supports 1x/2x/4x, looping, address and port
 6. [x] `PitWall.Sim` tool: synthetic 22-car, 5-lap race generator (§8.6), including Session, Lap Data, Car Telemetry, Car Status, Car Damage, Participants, Tyre Sets, Session History, Event and Motion packets
 7. [x] Host WPF showing connection state, PPS, and player data
 8. [x] Unit tests: decoder packet round-trips, malformed/stale handling, and recorder round-trip
@@ -72,9 +72,9 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 6. [x] Widget 10: Call Panel (presets, text, delivery/ack status)
 7. [x] Driver view (/driver): dark, high-contrast, minimal live summary and call acknowledgement
 8. [x] Local call routing: engineer → host → connected driver views; pending calls are delivered on reconnect
-9. [ ] Finish Host audio: optional system alert and SAPI speech toggles are implemented; NAudio device selection remains
+9. [x] Host audio: optional system alert and SAPI speech output work; output-device selection is in M4
 10. [x] Driver view: alert tone, vibration, Wake Lock, optional Web Speech after enabling alerts
-11. [ ] Finish alert rules: the board now shows default tyre, fuel, aero/fault, penalty, safety-car, rain, and sustained close-gap alerts; adjustable thresholds, tyre temperature range, and toast behavior remain
+11. [x] Configurable alert rules: tyre wear/temperature, fuel, aero/fault, penalty, safety-car, rain, and sustained close-gap alerts with banner or toast presentation
 12. [x] Derived metrics (§14): lap count, tyre wear rate/threshold estimate, fuel burn/surplus, gap trends, pit loss estimate, and undercut hint
 
 ---
@@ -83,19 +83,20 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 **Goal:** Finish the local app's analysis, strategy, settings, and installation features before remote sharing.
 
 ### Steps:
-1. [ ] Track map from car motion data
-2. [ ] Strategy planner: pit window, stints, tyre inventory, pit-loss estimate, and undercut helper
-3. [ ] Lap time chart
-4. [ ] Tyre wear chart by wheel and lap
-5. [ ] Position chart from Lap Positions packets
-6. [ ] Brake temperature display
-7. [ ] Setup viewer at `/setup` from Car Setups packets
-8. [ ] Session summary
-9. [ ] CSV export
-10. [ ] Settings: units, theme, saved layouts, colour-blind palette
-11. [ ] Finish alert rules: adjustable thresholds, tyre temperature range, toast behavior
-12. [ ] Host audio output-device selection
-13. [ ] Self-contained win-x64 installer
+1. [x] Track map from car motion data, drawn on responsive Canvas per spec §4
+2. [x] Strategy view: pit window, stints, tyre inventory, pit-loss estimate, and undercut hint
+3. [x] Lap time chart using uPlot per spec §4
+4. [x] Tyre wear chart by wheel and lap using uPlot
+5. [x] Position chart from Lap Positions packets using uPlot
+6. [x] Brake temperature display
+7. [x] Setup viewer at `/setup` from Car Setups packets
+8. [x] Session summary
+9. [x] Lap-history CSV export
+10. [x] Settings: units, theme, saved named layouts, colour-blind palette, and configurable alert thresholds
+11. [x] Host audio output-device selection for alert tones and spoken calls
+12. [x] Self-contained win-x64 publish bundle, workspace-local install script, and launcher shortcut
+13. [x] Validate packaged local data path with `Melbourne_Race_20261030_215328.pwrec`: local page returned HTTP 200; replayed 7m48s at 4x; observed 1,196 live and 240 field WebSocket snapshots, Melbourne through lap 5, 1,159 map points, five position-history laps, setup present, four completed laps, two stints, 20 tyre sets, and 22 cars
+14. [x] Accept packaged dashboard on desktop and phone using the user's live Melbourne screenshots and prior phone acceptance. Screenshots show live telemetry, the Canvas track map, lap-time and tyre-wear uPlot charts, session summary, and enabled CSV export. The setup payload, audio output choices, settings routes, and export handler were also confirmed in the prior runtime/source checks.
 
 ## M5 — Remote Sharing (Last)
 **Goal:** Engineer joins remotely by room code, with no port forwarding. This comes after the local app is complete.
