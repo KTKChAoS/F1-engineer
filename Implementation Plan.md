@@ -6,7 +6,7 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 
 ---
 
-## M0 — Skeleton (Incomplete)
+## M0 — Skeleton (Complete)
 **Goal:** Solution builds, CI runs build + tests, Contracts defined.
 
 ### Steps:
