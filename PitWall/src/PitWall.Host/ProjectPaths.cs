@@ -29,4 +29,5 @@ internal static class ProjectPaths
 
     public static string RecordingsDirectory => Path.Combine(RootDirectory, "recordings");
     public static string LogsDirectory => Path.Combine(RootDirectory, "logs");
+    public static string LocalSettingsPath => Path.Combine(RootDirectory, "settings.local.json");
 }

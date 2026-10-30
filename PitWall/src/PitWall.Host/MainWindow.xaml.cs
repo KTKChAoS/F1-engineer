@@ -2,10 +2,13 @@
 using System.IO;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using NAudio.CoreAudioApi;
 using PitWall.Contracts;
 using PitWall.Contracts.Enums;
 using PitWall.Contracts.Messages;
@@ -26,11 +29,15 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _replayCts;
     private readonly string _recordingsDir;
     private readonly int _udpPort = Constants.DefaultUdpPort;
+    private bool _loadingCallDevices;
+    private string? _callOutputDeviceId;
+    private string? _replayStatus;
 
     public MainWindow()
     {
         InitializeComponent();
         _recordingsDir = ProjectPaths.RecordingsDirectory;
+        LoadCallOutputDevices();
         IpText.Text = "This PC: " + string.Join(", ", GetPrivateIpv4Addresses());
     }
 
@@ -120,32 +127,81 @@ public partial class MainWindow : Window
         LapText.Text = $"P{p.Position}  lap {p.Lap}  sector {p.Sector}  current {FormatMs(p.CurrentLapMs)}  last {FormatMs(p.LastLapMs)}";
         TyreText.Text = $"{snap.VisualCompound}  age {snap.TyreAgeLaps}  wear {FormatWheels(snap.Tyres.WearPct)}";
         EnergyText.Text = $"Fuel {snap.Energy.FuelKg:0.0} kg ({snap.Energy.FuelLaps:0.0} laps)   ERS {snap.Energy.ErsPct:0}% {snap.Energy.ErsMode}";
-        RecordStatus.Text = _recorder.IsRecording ? $"Recording {_recorder.Path}" : "";
+        RecordStatus.Text = _recorder.IsRecording ? $"Recording {_recorder.Path}" : _replayStatus ?? "";
     }
 
     private void OnCallReceived(CallMessage call)
     {
         var playSound = false;
         var speak = false;
+        string? outputDeviceId = null;
         try
         {
             Dispatcher.Invoke(() =>
             {
                 playSound = CallSoundCheck.IsChecked == true;
                 speak = CallSpeechCheck.IsChecked == true;
+                outputDeviceId = _callOutputDeviceId;
             });
         }
         catch (TaskCanceledException) { return; }
         catch (InvalidOperationException) { return; }
 
         if (playSound)
-            HostCallAudio.PlayAlert();
+            _ = Task.Run(() => HostCallAudio.PlayAlertAsync(outputDeviceId));
         if (speak)
-            _ = Task.Run(() => HostCallAudio.Speak(call.Text));
+            _ = Task.Run(() => HostCallAudio.SpeakAsync(call.Text, outputDeviceId));
+    }
+
+    private void LoadCallOutputDevices()
+    {
+        _loadingCallDevices = true;
+        CallOutputDeviceCombo.Items.Clear();
+        CallOutputDeviceCombo.Items.Add(new ComboBoxItem { Content = "Default audio output", Tag = "" });
+        string? savedDeviceId = null;
+        try
+        {
+            if (File.Exists(ProjectPaths.LocalSettingsPath))
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(ProjectPaths.LocalSettingsPath));
+                if (document.RootElement.TryGetProperty("callOutputDeviceId", out var deviceId))
+                    savedDeviceId = deviceId.GetString();
+            }
+        }
+        catch (Exception ex) { Log.Warning(ex, "Could not read local audio settings"); }
+
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            foreach (var device in enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
+            {
+                CallOutputDeviceCombo.Items.Add(new ComboBoxItem { Content = device.FriendlyName, Tag = device.ID });
+                device.Dispose();
+            }
+        }
+        catch (Exception ex) { Log.Warning(ex, "Could not enumerate audio output devices"); }
+
+        var savedItem = CallOutputDeviceCombo.Items.OfType<ComboBoxItem>().FirstOrDefault(item => Equals(item.Tag, savedDeviceId));
+        CallOutputDeviceCombo.SelectedItem = savedItem ?? CallOutputDeviceCombo.Items[0];
+        _callOutputDeviceId = savedItem?.Tag as string;
+        _loadingCallDevices = false;
+    }
+
+    private void OnCallOutputDeviceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loadingCallDevices || CallOutputDeviceCombo.SelectedItem is not ComboBoxItem selected)
+            return;
+        _callOutputDeviceId = string.IsNullOrWhiteSpace(selected.Tag as string) ? null : selected.Tag as string;
+        try
+        {
+            File.WriteAllText(ProjectPaths.LocalSettingsPath, JsonSerializer.Serialize(new { callOutputDeviceId = _callOutputDeviceId }));
+        }
+        catch (Exception ex) { Log.Warning(ex, "Could not save local audio settings"); }
     }
 
     private void OnStartRecording(object sender, RoutedEventArgs e)
     {
+        _replayStatus = null;
         var snap = _store.Current;
         var path = _recorder.Start(_recordingsDir, snap.Track, snap.SessionType, DateTimeOffset.UtcNow);
         RecordStatus.Text = $"Recording {path}";
@@ -154,7 +210,8 @@ public partial class MainWindow : Window
     private void OnStopRecording(object sender, RoutedEventArgs e)
     {
         _recorder.Stop();
-        RecordStatus.Text = "Recording stopped";
+        _replayStatus = "Recording stopped";
+        RecordStatus.Text = _replayStatus;
     }
 
     private async void OnReplay(object sender, RoutedEventArgs e)
@@ -171,20 +228,22 @@ public partial class MainWindow : Window
 
         _replayCts?.Cancel();
         _replayCts = new CancellationTokenSource();
-        RecordStatus.Text = $"Replaying {dialog.FileName}";
+        _replayStatus = $"Replaying {Path.GetFileName(dialog.FileName)}";
+        RecordStatus.Text = _replayStatus;
         try
         {
             await Replayer.ReplayToUdpAsync(dialog.FileName, _udpPort, 1, false, _replayCts.Token);
-            RecordStatus.Text = "Replay finished";
+            _replayStatus = "Replay finished";
         }
         catch (OperationCanceledException)
         {
-            RecordStatus.Text = "Replay cancelled";
+            _replayStatus = "Replay cancelled";
         }
         catch (Exception ex)
         {
-            RecordStatus.Text = ex.Message;
+            _replayStatus = ex.Message;
         }
+        RecordStatus.Text = _replayStatus;
     }
 
     private void OnFirewall(object sender, RoutedEventArgs e)

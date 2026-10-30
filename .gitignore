@@ -9,6 +9,9 @@ TestResults/
 *.pwrec
 /recordings/
 /logs/
+/settings.local.json
+/PitWall/publish/
+/PitWall/app/
 node_modules/
 dist/
 *.nupkg

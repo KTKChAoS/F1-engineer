@@ -20,6 +20,8 @@
             <Button Content="Add firewall rules" Click="OnFirewall"/>
             <CheckBox x:Name="CallSoundCheck" Content="Call sound" Margin="8,0,8,0" VerticalAlignment="Center"/>
             <CheckBox x:Name="CallSpeechCheck" Content="Speak calls" Margin="0,0,12,0" VerticalAlignment="Center"/>
+            <TextBlock Text="Call audio" VerticalAlignment="Center" Margin="4,0,6,0"/>
+            <ComboBox x:Name="CallOutputDeviceCombo" Width="190" Height="30" VerticalAlignment="Center" SelectionChanged="OnCallOutputDeviceChanged"/>
             <TextBlock x:Name="RecordStatus" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}"/>
         </StackPanel>
 
