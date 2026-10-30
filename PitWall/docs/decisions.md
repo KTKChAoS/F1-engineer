@@ -16,6 +16,6 @@
 
 ## D003 — WPF Template
 
-**Decision:** Created Host as a WPF project targeting `net9.0-windows`
+**Decision:** Created Host as a WPF project targeting `net10.0-windows`
 **Reason:** Per spec §4, the Host is a WPF control-panel window with embedded Kestrel. The target framework is `net10.0-windows` to match D001.
 **Date:** 2026-10-29
