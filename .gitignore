@@ -1,0 +1,14 @@
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+TestResults/
+*.pwrec
+node_modules/
+dist/
+*.nupkg
+.idea/
+.DS_Store
