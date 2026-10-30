@@ -18,6 +18,8 @@
             <Button Content="Stop recording" Click="OnStopRecording"/>
             <Button Content="Replay file…" Click="OnReplay"/>
             <Button Content="Add firewall rules" Click="OnFirewall"/>
+            <CheckBox x:Name="CallSoundCheck" Content="Call sound" Margin="8,0,8,0" VerticalAlignment="Center"/>
+            <CheckBox x:Name="CallSpeechCheck" Content="Speak calls" Margin="0,0,12,0" VerticalAlignment="Center"/>
             <TextBlock x:Name="RecordStatus" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}"/>
         </StackPanel>
 
@@ -36,7 +38,7 @@
                     <TextBlock x:Name="FormatText"/>
                     <TextBlock x:Name="CountsText" Margin="0,8,0,0" Foreground="{StaticResource MutedBrush}"/>
                     <TextBlock x:Name="FormatWarning" Foreground="{StaticResource WarnBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
-                    <TextBlock Text="PS5: Telemetry On, Broadcast Off, UDP Format 2025, port 20777, this PC's IPv4."
+                    <TextBlock Text="PS5: Telemetry On, Broadcast On, UDP Format 2025, port 20777."
                                Foreground="{StaticResource MutedBrush}" Margin="0,16,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>

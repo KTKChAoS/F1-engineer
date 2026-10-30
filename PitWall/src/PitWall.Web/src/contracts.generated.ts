@@ -94,6 +94,7 @@ export interface DerivedMetrics {
   "fuelSurplusLaps"?: number | null;
   "gapAheadTrend"?: number | null;
   "gapBehindTrend"?: number | null;
+  "gapBehindUnder1sLaps": number;
   "pitLossS": number;
   "undercutHint": boolean;
 }

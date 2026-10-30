@@ -117,6 +117,16 @@ public sealed class StateStore
         _m.AirTempC = session.AirTemperature;
         _m.SafetyCar = GameEnumMapper.SafetyCar(session.SafetyCarStatus);
         _m.Paused = session.GamePaused;
+        var samples = session.WeatherForecastSamples.AsSpan();
+        var count = Math.Min(session.NumWeatherForecastSamples, samples.Length);
+        _m.Forecast = samples[..count].ToArray().Select(sample => new ForecastSample
+        {
+            OffsetMin = sample.TimeOffset,
+            Weather = GameEnumMapper.Weather(sample.Weather),
+            TrackTempC = sample.TrackTemperature,
+            AirTempC = sample.AirTemperature,
+            RainPct = sample.RainPercentage
+        }).ToArray();
     }
 
     private void ApplyLaps(LapDataPacket packet)
@@ -319,6 +329,7 @@ public sealed class StateStore
             AirTempC = _m.AirTempC,
             SafetyCar = _m.SafetyCar,
             Paused = _m.Paused,
+            Forecast = _m.Forecast,
             VisualCompound = player.VisualCompound,
             TyreAgeLaps = player.TyreAgeLaps,
             Events = _events.ToArray(),
@@ -346,6 +357,7 @@ public sealed class StateStore
             },
             GapAheadTrendMsPerLap = CalculateGapTrend(ahead: true),
             GapBehindTrendMsPerLap = CalculateGapTrend(ahead: false),
+            GapBehindUnder1sLaps = CalculateCloseGapLaps(),
             FieldCars = _cars.Select((car, i) => new CarInfo
             {
                 Index = i,
@@ -451,6 +463,23 @@ public sealed class StateStore
         return (lastGap - firstGap) / lapSpan;
     }
 
+    private int CalculateCloseGapLaps()
+    {
+        var count = 0;
+        byte? previousLap = null;
+        for (var i = _gapSamples.Count - 1; i >= 0; i--)
+        {
+            var sample = _gapSamples[i];
+            if (sample.BehindMs is null || sample.BehindMs.Value >= Constants.GapBehindAlertSeconds * 1000)
+                break;
+            if (previousLap is not null && sample.Lap + 1 != previousLap)
+                break;
+            count++;
+            previousLap = sample.Lap;
+        }
+        return count;
+    }
+
     private static float[] ToFloats<T>(Tyres<T> tyres) where T : unmanaged
     {
         return
@@ -540,5 +569,6 @@ public sealed class StateStore
         public float AirTempC;
         public SafetyCarStatus SafetyCar;
         public bool Paused;
+        public IReadOnlyList<ForecastSample> Forecast = [];
     }
 }

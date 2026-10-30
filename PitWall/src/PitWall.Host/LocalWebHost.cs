@@ -14,9 +14,12 @@ namespace PitWall.Host;
 internal sealed class LocalWebHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
+    private readonly LocalCallHub _callHub = new();
 
-    public LocalWebHost(StateStore store, int port)
+    public LocalWebHost(StateStore store, int port, Action<CallMessage>? onCallReceived = null)
     {
+        if (onCallReceived is not null)
+            _callHub.CallReceived += onCallReceived;
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
             ContentRootPath = AppContext.BaseDirectory
@@ -49,7 +52,22 @@ internal sealed class LocalWebHost : IAsyncDisposable
             }
 
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
-            await StreamSnapshotsAsync(socket, store, context.RequestAborted);
+            var peer = _callHub.Add(socket);
+            using var connectionCts = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+            try
+            {
+                var sending = _callHub.SendSnapshotsAsync(peer, store, connectionCts.Token);
+                var receiving = _callHub.ReceiveAsync(peer, connectionCts.Token);
+                await Task.WhenAny(sending, receiving);
+                connectionCts.Cancel();
+                try { await Task.WhenAll(sending, receiving); }
+                catch (OperationCanceledException) { }
+                catch (WebSocketException) { }
+            }
+            finally
+            {
+                _callHub.Remove(peer);
+            }
         });
     }
 
@@ -59,57 +77,4 @@ internal sealed class LocalWebHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();
 
-    private static async Task StreamSnapshotsAsync(WebSocket socket, StateStore store, CancellationToken cancellationToken)
-    {
-        long sequence = 0;
-        var lastEventId = 0;
-        var counter = 0;
-        try
-        {
-            while (socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
-            {
-                var snapshot = store.Current;
-                await SendAsync(socket, new WireMessage<LivePayload>
-                {
-                    Type = MessageTypes.Live,
-                    Seq = ++sequence,
-                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    Payload = SnapshotBuilder.BuildLive(snapshot)
-                }, cancellationToken);
-
-                foreach (var evt in SnapshotBuilder.BuildEvents(snapshot).Where(item => item.Id > lastEventId))
-                {
-                    lastEventId = Math.Max(lastEventId, evt.Id);
-                    await SendAsync(socket, new WireMessage<EventRecord>
-                    {
-                        Type = MessageTypes.Event,
-                        Seq = ++sequence,
-                        Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                        Payload = evt
-                    }, cancellationToken);
-                }
-
-                if (counter++ % 5 == 0)
-                {
-                    await SendAsync(socket, new WireMessage<FieldPayload>
-                    {
-                        Type = MessageTypes.Field,
-                        Seq = ++sequence,
-                        Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                        Payload = SnapshotBuilder.BuildField(snapshot)
-                    }, cancellationToken);
-                }
-
-                await Task.Delay(Constants.LiveSnapshotIntervalMs, cancellationToken);
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (WebSocketException) { }
-    }
-
-    private static async Task SendAsync<T>(WebSocket socket, WireMessage<T> message, CancellationToken cancellationToken)
-    {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(message, JsonDefaults.Options);
-        await socket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
-    }
 }

@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using Microsoft.Win32;
 using PitWall.Contracts;
 using PitWall.Contracts.Enums;
+using PitWall.Contracts.Messages;
 using PitWall.Core.Recording;
 using PitWall.Core.State;
 using PitWall.Core.Telemetry;
@@ -41,7 +42,7 @@ public partial class MainWindow : Window
         {
             _pipeline = new TelemetryPipeline(_udpPort, _store, _recorder, Log.Logger);
             _pipeline.Start();
-            _webHost = new LocalWebHost(_store, Constants.DefaultWebPort);
+            _webHost = new LocalWebHost(_store, Constants.DefaultWebPort, OnCallReceived);
             await _webHost.StartAsync();
             Log.Information("Local dashboard listening on port {Port}", Constants.DefaultWebPort);
         }
@@ -120,6 +121,27 @@ public partial class MainWindow : Window
         TyreText.Text = $"{snap.VisualCompound}  age {snap.TyreAgeLaps}  wear {FormatWheels(snap.Tyres.WearPct)}";
         EnergyText.Text = $"Fuel {snap.Energy.FuelKg:0.0} kg ({snap.Energy.FuelLaps:0.0} laps)   ERS {snap.Energy.ErsPct:0}% {snap.Energy.ErsMode}";
         RecordStatus.Text = _recorder.IsRecording ? $"Recording {_recorder.Path}" : "";
+    }
+
+    private void OnCallReceived(CallMessage call)
+    {
+        var playSound = false;
+        var speak = false;
+        try
+        {
+            Dispatcher.Invoke(() =>
+            {
+                playSound = CallSoundCheck.IsChecked == true;
+                speak = CallSpeechCheck.IsChecked == true;
+            });
+        }
+        catch (TaskCanceledException) { return; }
+        catch (InvalidOperationException) { return; }
+
+        if (playSound)
+            HostCallAudio.PlayAlert();
+        if (speak)
+            _ = Task.Run(() => HostCallAudio.Speak(call.Text));
     }
 
     private void OnStartRecording(object sender, RoutedEventArgs e)

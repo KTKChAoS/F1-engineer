@@ -1,6 +1,6 @@
 # PitWall F1 25 — Implementation Plan
 
-## Current Status: 🚧 M2 LAN Acceptance Pending; M3 Widgets — In Progress
+## Current Status: 🚧 M3 Interactions & Alerts — In Progress
 
 Progress was reconciled against the repository on 30 October 2026. A checked item means there is a concrete implementation or artifact in the repo; acceptance criteria and tests remain unchecked until they are present and verified.
 
@@ -56,7 +56,7 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 9. [x] Widget 3: Tyre Diagram (wear, temps, pressure, compound)
 10. [x] Widget 4: Fuel & ERS
 11. [x] Dashboard header (session, track, lap, weather, connection)
-12. [ ] Accept: phone on LAN sees live data
+12. [x] Accept: phone on LAN sees live lap telemetry
 
 ---
 
@@ -66,21 +66,39 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 ### Steps:
 1. [x] Widget 5: Gap Ahead/Behind with per-lap trend arrows
 2. [x] Widget 6: Lap Table (last 10 laps, sectors, validity, compound)
-3. [ ] Widget 7: Damage Panel
-4. [ ] Widget 8: Weather Panel + forecast
-5. [ ] Widget 9: Events Feed
-6. [ ] Widget 10: Call Panel (presets, text, status)
-7. [ ] Driver view (/driver): dark, high-contrast, minimal
-8. [ ] Call routing: engineer → host → driver views
-9. [ ] Audio: NAudio + Windows speech synthesis on host
-10. [ ] Driver view: alert tone, vibration, Wake Lock, speech
-11. [ ] Alert rules (tyre wear, fuel, damage, penalties, rain)
-12. [ ] Derived metrics (§14)
+3. [x] Widget 7: Damage Panel
+4. [x] Widget 8: Weather Panel + 60-minute forecast
+5. [x] Widget 9: Events Feed
+6. [x] Widget 10: Call Panel (presets, text, delivery/ack status)
+7. [x] Driver view (/driver): dark, high-contrast, minimal live summary and call acknowledgement
+8. [x] Local call routing: engineer → host → connected driver views; pending calls are delivered on reconnect
+9. [ ] Finish Host audio: optional system alert and SAPI speech toggles are implemented; NAudio device selection remains
+10. [x] Driver view: alert tone, vibration, Wake Lock, optional Web Speech after enabling alerts
+11. [ ] Finish alert rules: the board now shows default tyre, fuel, aero/fault, penalty, safety-car, rain, and sustained close-gap alerts; adjustable thresholds, tyre temperature range, and toast behavior remain
+12. [x] Derived metrics (§14): lap count, tyre wear rate/threshold estimate, fuel burn/surplus, gap trends, pit loss estimate, and undercut hint
 
 ---
 
-## M4 — Relay & Room Codes
-**Goal:** Remote engineer joins via room code, no port forwarding.
+## M4 — Full Local App (Phase 2 & Polish)
+**Goal:** Finish the local app's analysis, strategy, settings, and installation features before remote sharing.
+
+### Steps:
+1. [ ] Track map from car motion data
+2. [ ] Strategy planner: pit window, stints, tyre inventory, pit-loss estimate, and undercut helper
+3. [ ] Lap time chart
+4. [ ] Tyre wear chart by wheel and lap
+5. [ ] Position chart from Lap Positions packets
+6. [ ] Brake temperature display
+7. [ ] Setup viewer at `/setup` from Car Setups packets
+8. [ ] Session summary
+9. [ ] CSV export
+10. [ ] Settings: units, theme, saved layouts, colour-blind palette
+11. [ ] Finish alert rules: adjustable thresholds, tyre temperature range, toast behavior
+12. [ ] Host audio output-device selection
+13. [ ] Self-contained win-x64 installer
+
+## M5 — Remote Sharing (Last)
+**Goal:** Engineer joins remotely by room code, with no port forwarding. This comes after the local app is complete.
 
 ### Steps:
 1. [ ] `PitWall.Relay` ASP.NET Core minimal API
@@ -94,15 +112,3 @@ Progress was reconciled against the repository on 30 October 2026. A checked ite
 9. [ ] Reconnect with exponential backoff (§11.5)
 10. [ ] Dockerfile + fly.toml (§15)
 11. [ ] Integration tests: fake host + viewers
-
----
-
-## M5 — Phase 2 & Polish
-**Goal:** Track map, strategy planner, charts, installer.
-
-- Track map (Canvas + motion data)
-- Strategy planner (pit window, stints, tyre inventory)
-- Lap time chart, tyre wear chart, position chart (uPlot)
-- Setup viewer, session summary, CSV export
-- Settings (units, theme, saved layouts, colour-blind palette)
-- Self-contained win-x64 installer

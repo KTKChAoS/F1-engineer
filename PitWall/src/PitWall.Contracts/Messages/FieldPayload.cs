@@ -372,6 +372,9 @@ public sealed class DerivedMetrics
     [JsonPropertyName("gapBehindTrend")]
     public float? GapBehindTrend { get; init; }
 
+    [JsonPropertyName("gapBehindUnder1sLaps")]
+    public int GapBehindUnder1sLaps { get; init; }
+
     [JsonPropertyName("pitLossS")]
     public float PitLossS { get; init; }
 

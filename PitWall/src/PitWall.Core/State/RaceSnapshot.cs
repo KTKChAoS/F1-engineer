@@ -47,6 +47,8 @@ public sealed class RaceSnapshot
     public IReadOnlyList<CarInfo> FieldCars { get; init; } = [];
     public IReadOnlyList<LapRecord> LapLog { get; init; } = [];
     public DamageInfo Damage { get; init; } = new();
+    public IReadOnlyList<ForecastSample> Forecast { get; init; } = [];
     public float? GapAheadTrendMsPerLap { get; init; }
     public float? GapBehindTrendMsPerLap { get; init; }
+    public int GapBehindUnder1sLaps { get; init; }
 }
